@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>能・狂言かるた</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&display=swap">
+<style>
+:root{--bg:#4a5a3c;--ink:#1f1b16;--paper:#f4ecd6;--noh:#5a3a72;--kyo:#b23a2a;--panel:#efe6cc;--text:#1f1b16;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#2c3626;--panel:#e6dcc0}}
+:root[data-theme="dark"]{--bg:#2c3626;--panel:#e6dcc0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;min-height:100vh}
+main{max-width:560px;margin:0 auto;padding:16px 12px 28px}
+h1{margin:0 0 10px;color:var(--paper);font-size:1.5rem;letter-spacing:.15em;text-align:center}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--paper);margin-bottom:10px;font-size:.95rem}
+.modes button{font:inherit;padding:5px 12px;border:1px solid var(--paper);background:transparent;color:var(--paper);border-radius:2px;cursor:pointer}
+.modes button[aria-pressed="true"]{background:var(--paper);color:var(--ink)}
+button:focus-visible,.card:focus-visible{outline:3px solid #ffd76a;outline-offset:2px}
+#reader{background:var(--panel);border-left:8px solid var(--noh);padding:14px 16px;min-height:118px;margin-bottom:14px;border-radius:2px}
+#reader.k{border-left-color:var(--kyo)}
+#reader small{display:block;margin-bottom:6px;font-weight:700;color:var(--noh)}
+#reader.k small{color:var(--kyo)}
+#reader p{margin:0;font-size:1.08rem;line-height:1.8}
+#grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.card{height:150px;background:var(--paper);border:0;border-top:7px solid var(--noh);border-radius:2px;box-shadow:0 2px 0 rgba(0,0,0,.35);font-family:inherit;font-weight:700;font-size:1.5rem;color:var(--ink);writing-mode:vertical-rl;letter-spacing:.12em;cursor:pointer;padding:8px 0;transition:opacity .35s,transform .35s}
+.card.k{border-top-color:var(--kyo)}
+.card.taken{opacity:0;transform:scale(.85);pointer-events:none}
+.card.bad{animation:sh .3s;background:#f0c9c0}
+@keyframes sh{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+#note{color:var(--paper);text-align:center;min-height:1.6em;margin:12px 0 0;font-size:.95rem}
+#end{display:none;background:var(--panel);padding:20px;text-align:center;border-radius:2px;margin-top:14px}
+#end b{font-size:1.6rem;display:block;margin:6px 0 12px}
+#end button{font:inherit;padding:8px 22px;background:var(--ink);color:var(--paper);border:0;border-radius:2px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.card,.card.bad{transition:none;animation:none}}
+@media (max-width:380px){.card{height:130px;font-size:1.25rem}}
+</style>
+</head>
+<body>
+<main>
+<h1>能・狂言かるた</h1>
+<div class="bar">
+  <div class="modes" role="group" aria-label="出題範囲">
+    <button data-m="all" aria-pressed="true">すべて</button>
+    <button data-m="能" aria-pressed="false">能</button>
+    <button data-m="狂言" aria-pressed="false">狂言</button>
+  </div>
+  <div id="score" aria-live="polite"></div>
+</div>
+<section id="reader" aria-live="polite"><small></small><p></p></section>
+<div id="grid"></div>
+<p id="note"></p>
+<div id="end"><span>結果</span><b></b><button id="again">もう一度</button></div>
+</main>
+<script>
+var D=[
+["高砂","能","相生の松の精である老夫婦が現れ、夫婦和合と長寿を言祝ぐ祝言の能。"],
+["羽衣","能","漁師が拾った天女の衣。返す代わりに、天女は舞を舞って見せる。"],
+["井筒","能","在原業平の妻だった女の霊が、旅の僧に昔を語る夢幻能。"],
+["隅田川","能","人買いにさらわれた我が子を探す狂女が、川のほとりで子の墓に出会う。"],
+["道成寺","能","鐘供養の場に白拍子が現れ、鐘の中へ飛び込む。蛇となった女の執心。"],
+["安宅","能","山伏姿の義経一行が、関所の富樫に行く手を阻まれる。「勧進帳」の元。"],
+["船弁慶","能","義経一行の船出に、海上で平知盛の亡霊が襲いかかる。"],
+["土蜘蛛","能","病の源頼光のもとへ怪しい僧が現れ、千筋の糸を投げかける。"],
+["敦盛","能","熊谷直実が討った平家の若武者の霊が、笛を手に現れる。"],
+["鉢木","能","雪の夜、落ちぶれた武士が大切な鉢の木を焚き、旅の僧をもてなす。"],
+["松風","能","須磨の浦で、在原行平を慕う海女姉妹の霊が汐汲みの姿で現れる。"],
+["熊野","能","病の母を案じる愛妾が、主人に花見へ連れ出され、和歌を詠む。"],
+["融","能","源融の霊が、京の六条河原院の跡に月夜の舞を見せる。"],
+["班女","能","恋人を待ち続ける遊女が、扇を手に狂女となり、やがて再会する。"],
+["求塚","能","二人の男に求愛された菟名日処女が、身を投げ、地獄の苦しみを訴える。"],
+["卒都婆小町","能","老いた小野小町が、卒都婆に腰掛けて高野山の僧と問答をする。"],
+["野宮","能","六条御息所の霊が、嵯峨野の社で光源氏との思い出を語る。"],
+["葵上","能","六条御息所の生霊が、光源氏の正妻を苦しめる。"],
+["鵺","能","源頼政に退治された怪物の霊が、舟に乗って最期を語る。"],
+["田村","能","坂上田村麻呂の霊が、清水寺で鬼神を退治した武勇を見せる。"],
+["経正","能","琵琶の名手だった平経正の霊が、竹生島に現れて管弦を奏でる。"],
+["弱法師","能","盲目となった少年が、天王寺で春の夕べに父と再会する。"],
+["花筐","能","天皇と別れた女が、形見の花籠を手に狂乱して都へ上る。"],
+["姨捨","能","月の名所で、老女の霊が旅人に昔を語り、月に舞う。"],
+["石橋","能","険しい石橋を渡ろうとする僧の前に、獅子が現れ牡丹に舞い戯れる。"],
+["邯鄲","能","青年が不思議な枕で眠り、栄華を極める一生を夢に見る。"],
+["清経","能","入水した平清経の霊が、妻の前に現れて最期を語る。"],
+["江口","能","西行に宿を断った遊女の霊が現れ、やがて普賢菩薩の姿となる。"],
+["山姥","能","山姥の曲舞で名高い遊女の前に、本物の山姥が現れて山巡りを語る。"],
+["三輪","能","僧のもとへ通う女は、三輪明神の化身だった。"],
+["附子","狂言","留守番の二人が、「毒」と言われた砂糖をなめてしまう。"],
+["棒縛","狂言","両手を棒に縛られた二人が、それでも酒を飲み、舞い出す。"],
+["柿山伏","狂言","空腹の山伏が柿を盗み食い、鳶や猿の真似をさせられる。"],
+["靭猿","狂言","大名が猿曳の猿の皮を欲しがるが、猿の健気な芸に心を動かされる。"],
+["千鳥","狂言","酒屋の主人の気をそらすため、太郎冠者が囃子の謡と舞でごまかそうとする。"],
+["蚊相撲","狂言","人間に化けた蚊の精が、大名に相撲を挑む。"],
+["釣狐","狂言","老いた狐が僧に化け、猟師の伯父に殺生をやめよと説く。罠の餌に心が揺れる。"],
+["月見座頭","狂言","中秋の名月の夜、目の不自由な男が虫の音を楽しみ、通りがかりの男と酒を酌み交わす。"],
+["茸","狂言","家に生えた茸を山伏が祈祷すると、かえって増えてしまう。"],
+["佐渡狐","狂言","年貢を納める道中、佐渡に狐がいるかどうかで、百姓二人が賭けをする。"],
+["花子","狂言","愛人に会いたい男が、妻に座禅を組むと偽って出かける。"],
+["萩大名","狂言","教わった和歌を、庭の萩を詠む場でとんでもなく間違える田舎大名。"],
+["寝音曲","狂言","歌を所望された太郎冠者が、主人の膝枕でなら歌うと言い出す。"],
+["武悪","狂言","主人に成敗を命じられた太郎冠者が、友の武悪を逃がす。"],
+["墨塗","狂言","泣き真似をする女の顔に、水の代わりに墨を塗ってからかう。"],
+["節分","狂言","女に一目惚れした鬼が口説くが、結局は豆で追い払われる。"],
+["鬼瓦","狂言","訴訟を終えた大名が、薬師堂の鬼瓦を見て故郷の妻の顔を思い出す。"],
+["茶壺","狂言","見知らぬ男に茶壺を奪われ、双方が歌い舞いながら取り合う。"],
+["蝸牛","狂言","山伏が蝸牛を探すうち、「囃せば来る」と太郎冠者にだまされ囃し出す。"],
+["二人大名","狂言","道で出会った男に、二人の大名が太刀を奪われ、家来にされてしまう。"],
+["磁石","狂言","人買いに追われた男が、身を守るために自分を磁石と偽る。"],
+["悪太郎","狂言","酒に酔って寝た乱暴者が、伯父に僧の姿にされて改心する。"],
+["首引","狂言","鬼の娘が源為朝を食べようとして、首引きの勝負を挑む。"],
+["仏師","狂言","仏像を買いに来た田舎者を、詐欺師が自ら仏に化けてだます。"],
+["木六駄","狂言","雪の峠を荷を運ぶ太郎冠者が、茶屋の酒に酔ってしまう。"],
+["素襖落","狂言","伯父の家で酒に酔った太郎冠者が、贈られた素襖を落としてしまう。"],
+["瓜盗人","狂言","瓜を盗みに来た男が、案山子のふりをして畑の持ち主の目をごまかそうとする。"],
+["石神","狂言","家出した妻の前に、夫が石神に化けて現れる。"],
+["六地蔵","狂言","客をだまそうと、詐欺師たちが六体の地蔵に化ける。"],
+["止動方角","狂言","太郎冠者が「止動方角」と口にすると、借りた馬が暴れ出す。"]
+];
+var mode="all",pool=[],deck=[],cur=0,ok=0,miss=0,busy=false,Q=10;
+var $=function(s){return document.querySelector(s)};
+function shuf(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+function start(){
+  pool=D.filter(function(d){return mode==="all"||d[1]===mode});
+  deck=shuf(pool).slice(0,Q);ok=0;miss=0;cur=0;busy=false;
+  $("#end").style.display="none";$("#note").textContent="読み札をよく聞いて、取り札を選ぼう。";
+  show();
+}
+function score(){$("#score").textContent="正解 "+ok+"　お手つき "+miss}
+function show(){
+  var d=deck[cur],r=$("#reader");
+  r.className=d[1]==="狂言"?"k":"";
+  r.querySelector("small").textContent="読み札（"+d[1]+"）　"+(cur+1)+" / "+deck.length;
+  r.querySelector("p").textContent=d[2];
+  var others=shuf(pool.filter(function(x){return x!==d})).slice(0,7);
+  var g=$("#grid");g.innerHTML="";
+  shuf([d].concat(others)).forEach(function(c){
+    var b=document.createElement("button");
+    b.className="card"+(c[1]==="狂言"?" k":"");b.textContent=c[0];b.dataset.t=c[0];
+    b.setAttribute("aria-label",c[0]);
+    b.onclick=function(){pick(b)};g.appendChild(b);
+  });
+  score();
+}
+function pick(b){
+  if(busy)return;var d=deck[cur];
+  if(b.dataset.t===d[0]){
+    busy=true;ok++;b.classList.add("taken");
+    $("#note").textContent="正解！ 「"+d[0]+"」は"+d[1]+"の演目です。";
+    cur++;score();
+    setTimeout(function(){busy=false;cur<deck.length?show():finish()},700);
+  }else{
+    miss++;b.classList.add("bad");
+    setTimeout(function(){b.classList.remove("bad")},320);
+    $("#note").textContent="お手つき。もう一度、読み札を読んでみよう。";
+    score();
+  }
+}
+function finish(){
+  $("#grid").innerHTML="";
+  $("#end b").textContent=deck.length+"問中 お手つき "+miss+"回";
+  $("#end").style.display="block";
+  $("#note").textContent=miss===0?"お手つきなし。見事です。":"もう一度挑戦してみよう。";
+}
+document.querySelectorAll(".modes button").forEach(function(b){
+  b.onclick=function(){
+    mode=b.dataset.m;
+    document.querySelectorAll(".modes button").forEach(function(x){x.setAttribute("aria-pressed",x===b)});
+    start();
+  };
+});
+$("#again").onclick=start;
+start();
+</script>
+</body>
+</html>
